@@ -4,6 +4,8 @@ A boilerplate for running Claude Code in an autonomous TDD development loop that
 
 ## One Prompt. Full App.
 
+For this repo, open claude code and ask for your app. Example:
+
 ```
 > Create an iOS app that teaches kids mental math. It should have timed
 > challenges, difficulty levels, a progress tracker with streaks, and fun
