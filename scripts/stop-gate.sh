@@ -32,9 +32,10 @@ extract_prompt() {
 
 # --- Helper: substitute template variables in a string ---
 # Usage: result=$(template_sub "$template" "KEY" "VALUE")
+# Uses bash parameter expansion to avoid sed multiline issues.
 template_sub() {
   local text="$1" key="$2" val="$3"
-  echo "$text" | sed "s|{{${key}}}|${val}|g"
+  echo "${text//\{\{${key}\}\}/${val}}"
 }
 
 # Detect project type: SPM (Package.swift) or Xcode project (.xcodeproj/.xcworkspace)
@@ -53,6 +54,15 @@ fi
 ISSUES=""
 ACTIONS=""
 
+# Auto-detect simulator destination
+SIM_DEST=""
+if [ "$PROJECT_TYPE" = "xcode" ]; then
+  SIM_DEST=$(bash "$PROJECT_DIR/scripts/find-simulator.sh" 2>/dev/null)
+  if [ -z "$SIM_DEST" ]; then
+    SIM_DEST="platform=iOS Simulator,name=iPhone 16"
+  fi
+fi
+
 # 1. Build check
 if [ "$PROJECT_TYPE" = "spm" ]; then
   if ! swift build >/dev/null 2>&1; then
@@ -62,7 +72,7 @@ if [ "$PROJECT_TYPE" = "spm" ]; then
 else
   XCPROJ=$(ls -d *.xcodeproj 2>/dev/null | head -1)
   SCHEME="${XCPROJ%.xcodeproj}"
-  if [ -n "$XCPROJ" ] && ! xcodebuild build -project "$XCPROJ" -scheme "$SCHEME" -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' -quiet 2>/dev/null; then
+  if [ -n "$XCPROJ" ] && ! xcodebuild build -project "$XCPROJ" -scheme "$SCHEME" -sdk iphonesimulator -destination "$SIM_DEST" -quiet 2>/dev/null; then
     ISSUES="${ISSUES}build_failure "
     ACTIONS="${ACTIONS}>> IMMEDIATE: Fix the build error. Run 'xcodebuild build' to see full errors.\n"
   fi
@@ -77,7 +87,7 @@ if [ "$PROJECT_TYPE" = "spm" ]; then
 else
   XCPROJ=$(ls -d *.xcodeproj 2>/dev/null | head -1)
   SCHEME="${XCPROJ%.xcodeproj}"
-  if [ -n "$XCPROJ" ] && ! xcodebuild test -project "$XCPROJ" -scheme "$SCHEME" -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' -quiet 2>/dev/null; then
+  if [ -n "$XCPROJ" ] && ! xcodebuild test -project "$XCPROJ" -scheme "$SCHEME" -sdk iphonesimulator -destination "$SIM_DEST" -quiet 2>/dev/null; then
     ISSUES="${ISSUES}test_failure "
     ACTIONS="${ACTIONS}>> IMMEDIATE: Fix failing tests. Run 'xcodebuild test' to see which tests fail.\n"
   fi
@@ -186,18 +196,9 @@ if [ -n "$ISSUES" ]; then
   REASON=$(template_sub "$TEMPLATE" "PASSING" "$PASSING")
   REASON=$(template_sub "$REASON" "TOTAL" "$TOTAL")
 
-  ACTIONS_EXPANDED=$(echo -e "$ACTIONS")
-  if [ -n "$ACTIONS_EXPANDED" ]; then
-    REASON=$(echo "$REASON" | sed "s|{{ACTIONS}}|$ACTIONS_EXPANDED|")
-  else
-    REASON=$(echo "$REASON" | sed "s|{{ACTIONS}}||")
-  fi
-
-  if [ -n "$NEXT_PROMPT" ]; then
-    REASON=$(echo "$REASON" | sed "s|{{NEXT_PROMPT}}|$NEXT_PROMPT|")
-  else
-    REASON=$(echo "$REASON" | sed "s|{{NEXT_PROMPT}}||")
-  fi
+  ACTIONS_EXPANDED=$(printf '%b' "$ACTIONS")
+  REASON="${REASON//\{\{ACTIONS\}\}/$ACTIONS_EXPANDED}"
+  REASON="${REASON//\{\{NEXT_PROMPT\}\}/$NEXT_PROMPT}"
 
   echo "$REASON" >&2
   exit 2

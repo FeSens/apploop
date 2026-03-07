@@ -81,40 +81,129 @@ When entering QA mode for the first time:
 
 ### Phase 2: Execute QA Flows
 
+#### IMPORTANT: Use XCUITest for Navigation, Not simctl
+
+**`xcrun simctl` has NO tap/swipe/input commands.** Do NOT attempt to:
+- Use `simctl io tap` (does not exist)
+- Use AppleScript/osascript to click in the simulator window (unreliable coordinates)
+- Use Chrome browser automation tools (those are for web pages, not native apps)
+- Extract screenshots from `.xcresult` bundles (complex and brittle)
+
+**The reliable approach: Write a `QAScreenshots` XCUITest class** that navigates
+the app programmatically and saves screenshots directly to the filesystem.
+
+#### Step 1: Write the QA Screenshot Test
+
+Create `UITests/QAScreenshots.swift` — a dedicated test class that walks through
+every screen and saves PNGs directly to disk:
+
+```swift
+import XCTest
+
+final class QAScreenshots: XCTestCase {
+    let app = XCUIApplication()
+    // Use absolute path to project screenshots directory
+    let screenshotDir = "<ABSOLUTE_PROJECT_PATH>/screenshots"
+
+    override func setUp() {
+        continueAfterFailure = true
+        app.launch()
+    }
+
+    func testCaptureAllScreens() {
+        // Create screenshots dir if needed
+        try? FileManager.default.createDirectory(
+            atPath: screenshotDir,
+            withIntermediateDirectories: true
+        )
+
+        // 1. Home screen
+        let someElement = app.buttons["someAccessibilityId"]
+        XCTAssertTrue(someElement.waitForExistence(timeout: 10))
+        saveScreenshot("qa-01-home")
+
+        // 2. Navigate to next screen
+        someElement.tap()
+        XCTAssertTrue(app.otherElements["nextScreen"].waitForExistence(timeout: 5))
+        Thread.sleep(forTimeInterval: 1) // let animations settle
+        saveScreenshot("qa-02-next-screen")
+
+        // ... continue for each flow/screen
+    }
+
+    private func saveScreenshot(_ name: String) {
+        let screenshot = XCUIScreen.main.screenshot()
+        let data = screenshot.pngRepresentation
+        let url = URL(fileURLWithPath: "\(screenshotDir)/\(name).png")
+        try? data.write(to: url)
+    }
+}
+```
+
+**Key patterns:**
+- Use `accessibilityIdentifier` for element lookup (set these in your SwiftUI views)
+- Use `waitForExistence(timeout:)` before interacting — never assume an element is there
+- Add `Thread.sleep(forTimeInterval: 1)` after navigation for animations to settle
+- Use `continueAfterFailure = true` so one screen failing doesn't skip the rest
+- Save screenshots directly to filesystem — do NOT use `XCTAttachment` (extracting from xcresult is painful)
+
+#### Step 2: Run the QA Screenshot Test
+
+```bash
+# Auto-detect simulator
+SIM_DEST=$(bash scripts/find-simulator.sh)
+
+# Run only the QA screenshot test
+xcodebuild test -project {{PROJECT_NAME}}.xcodeproj -scheme {{PROJECT_NAME}} \
+  -sdk iphonesimulator -destination "$SIM_DEST" \
+  -only-testing '{{PROJECT_NAME}}UITests/QAScreenshots' \
+  -resultBundlePath /tmp/qa-results.xcresult 2>&1 | tail -20
+```
+
+#### Step 3: Review Screenshots
+
+Read each screenshot with the `Read` tool and apply the visual checklist (below).
+
+#### Step 4: Dark Mode Pass
+
+Dark mode cannot be toggled from inside XCUITest. Use `simctl` to switch appearance,
+then relaunch and re-screenshot:
+
+```bash
+SIM_UUID=<simulator-uuid>
+
+# Switch to dark mode
+xcrun simctl ui $SIM_UUID appearance dark
+
+# Relaunch the app
+xcrun simctl terminate $SIM_UUID {{BUNDLE_ID}} 2>/dev/null
+xcrun simctl launch $SIM_UUID {{BUNDLE_ID}}
+sleep 3
+
+# Screenshot
+xcrun simctl io $SIM_UUID screenshot screenshots/qa-dark-home.png
+
+# Restore light mode when done
+xcrun simctl ui $SIM_UUID appearance light
+```
+
+**Common dark mode issue:** Text using `.secondary` or semantic colors becomes invisible
+when the background uses a hardcoded light gradient. Fix: use `Color(.label)` /
+`Color(.secondaryLabel)` and ensure background colors adapt, or use
+`@Environment(\.colorScheme)` to pick gradient colors.
+
+#### Step 5: Fix Issues and Re-verify
+
 For EACH flow in `qa-report.json`:
 
-1. **Build and install** the app in the simulator:
-   ```bash
-   xcodebuild build -project {{PROJECT_NAME}}.xcodeproj -scheme {{PROJECT_NAME}} \
-     -sdk iphonesimulator -destination 'id={{SIMULATOR_UUID}}' \
-     -derivedDataPath .build/derived
-   xcrun simctl install {{SIMULATOR_UUID}} .build/derived/Build/Products/Debug-iphonesimulator/{{PROJECT_NAME}}.app
-   ```
-
-2. **Launch the app**:
-   ```bash
-   xcrun simctl launch {{SIMULATOR_UUID}} {{BUNDLE_ID}}
-   ```
-
-3. **For each step**:
-   a. Perform the action (tap, swipe, navigate) using computer use
-   b. Wait for the UI to settle (animations, loading states)
-   c. Take a screenshot:
-      ```bash
-      xcrun simctl io {{SIMULATOR_UUID}} screenshot screenshots/qa-XXX-step-YY.png
-      ```
-   d. **Read the screenshot** with the Read tool — visually analyze it
-   e. Check against the visual checklist (see below)
-   f. Record the result in `qa-report.json`
-
-4. **If an issue is found**:
+1. Review screenshots against the visual checklist
+2. **If an issue is found**:
    a. Record the issue in `steps[].issues`
    b. Fix the code
-   c. Rebuild, reinstall, relaunch
-   d. Re-verify the step — take a NEW screenshot
+   c. Re-run the QA screenshot test (or just the affected portion)
+   d. Re-review the new screenshot
    e. Continue only when the step passes
-
-5. **After all steps pass**: mark `flow.verified = true`
+3. **After all steps pass**: mark `flow.verified = true`
 
 ### Phase 2b: Extended Usage / Soak Testing
 

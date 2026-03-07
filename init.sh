@@ -51,14 +51,20 @@ elif XCPROJ=$(ls -d *.xcodeproj 2>/dev/null | head -1); [ -n "$XCPROJ" ]; then
     SCHEME="${XCPROJ%.xcodeproj}"
     echo "Detected: Xcode project ($XCPROJ, scheme: $SCHEME)"
 
+    SIM_DEST=$(bash "$PROJECT_DIR/scripts/find-simulator.sh" 2>/dev/null)
+    if [ -z "$SIM_DEST" ]; then
+        SIM_DEST="platform=iOS Simulator,name=iPhone 16"
+    fi
+    echo "Simulator destination: $SIM_DEST"
+
     echo "Building project..."
     xcodebuild build -project "$XCPROJ" -scheme "$SCHEME" -sdk iphonesimulator \
-        -destination 'platform=iOS Simulator,name=iPhone 16' -quiet 2>&1 | tail -5
+        -destination "$SIM_DEST" -quiet 2>&1 | tail -5
     echo "  OK"
 
     echo "Running tests (baseline check)..."
     xcodebuild test -project "$XCPROJ" -scheme "$SCHEME" -sdk iphonesimulator \
-        -destination 'platform=iOS Simulator,name=iPhone 16' -quiet 2>&1 | tail -10
+        -destination "$SIM_DEST" -quiet 2>&1 | tail -10
     echo "  OK"
 else
     echo "No Package.swift or .xcodeproj found — skipping build/test (create project structure first)"

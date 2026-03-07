@@ -33,6 +33,22 @@ xcodebuild test  -project <Name>.xcodeproj -scheme <Name> -sdk iphonesimulator -
 swiftlint lint               # Lint the codebase
 ```
 
+## Template Submodule Files
+
+This repo is used as a **git submodule** inside target projects. NEVER delete or modify these
+template infrastructure files — they are part of the apploop template, not the target project:
+
+- `CLAUDE.md`
+- `init.sh`
+- `stop-gate.sh`
+- `scripts/` directory (e.g. `dependency-graph.py`)
+- `docs/` directory (e.g. `architecture.md`, `conventions.md`, `parallel-development.md`, `qa-strategy.md`)
+- `.claude/` configuration files (hooks, settings)
+
+When the target project commits, these files must NOT be removed or flattened into the repo.
+If git shows the `apploop` submodule as a tracked file/directory, leave it alone — do not
+delete the submodule reference.
+
 ## Development Rules
 
 - ALWAYS write the test BEFORE the implementation (TDD: red-green-refactor)
@@ -213,19 +229,37 @@ QA mode activates after all features pass. See `docs/qa-strategy.md` for the ful
    - Look for: stale data, badge drift, layout breaking with many items, ghost items, lost scroll position
 7. **After all flows verified (including soak)**: run full XCUITest suite, set `qa-report.json` status to `"passed"`, commit
 
-### Screenshot Commands
+### QA Screenshot Strategy (CRITICAL)
 
-```bash
-# Take screenshot
-xcrun simctl io {{SIMULATOR_UUID}} screenshot screenshots/<name>.png
+**DO NOT** attempt to interact with the simulator via `simctl tap` (doesn't exist),
+AppleScript coordinate clicking (unreliable), or Chrome browser tools (web only).
 
-# Toggle dark mode
-xcrun simctl ui {{SIMULATOR_UUID}} appearance dark
-xcrun simctl ui {{SIMULATOR_UUID}} appearance light
+**DO** write a `QAScreenshots` XCUITest class that navigates the app and saves
+screenshots directly to the filesystem. This is the only reliable approach.
 
-# Rotate to landscape
-xcrun simctl io {{SIMULATOR_UUID}} enumerate  # check orientation options
+```swift
+// UITests/QAScreenshots.swift — saves PNGs directly to disk
+private func saveScreenshot(_ name: String) {
+    let screenshot = XCUIScreen.main.screenshot()
+    let data = screenshot.pngRepresentation
+    let url = URL(fileURLWithPath: "\(screenshotDir)/\(name).png")
+    try? data.write(to: url)
+}
 ```
+
+Run it with: `xcodebuild test -only-testing '{{PROJECT_NAME}}UITests/QAScreenshots'`
+
+For dark mode, use `simctl` outside the test:
+```bash
+xcrun simctl ui {{SIMULATOR_UUID}} appearance dark
+xcrun simctl terminate {{SIMULATOR_UUID}} {{BUNDLE_ID}}
+xcrun simctl launch {{SIMULATOR_UUID}} {{BUNDLE_ID}}
+sleep 3
+xcrun simctl io {{SIMULATOR_UUID}} screenshot screenshots/qa-dark-home.png
+xcrun simctl ui {{SIMULATOR_UUID}} appearance light
+```
+
+See `docs/qa-strategy.md` for the full QA screenshot workflow.
 
 ### QA Report Status
 
