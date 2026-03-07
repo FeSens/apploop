@@ -12,11 +12,24 @@
 
 ## Build & Test Commands
 
+The project auto-detects its type: **SPM** (`Package.swift`) or **Xcode** (`.xcodeproj`).
+All scripts (`init.sh`, `stop-gate.sh`, PostToolUse hooks) handle both. When adding new
+scripts or hooks that build/test, you MUST support both project types — never hardcode
+`swift build`/`swift test` without also handling `xcodebuild`.
+
+### SPM project (Package.swift exists)
 ```bash
 ./init.sh                    # Bootstrap environment (idempotent)
 swift build                  # Build the project
 swift test                   # Run all unit tests
 swift test --filter <Name>   # Run a specific test
+```
+
+### Xcode project (.xcodeproj exists)
+```bash
+./init.sh                    # Bootstrap environment (idempotent, auto-detects)
+xcodebuild build -project <Name>.xcodeproj -scheme <Name> -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16'
+xcodebuild test  -project <Name>.xcodeproj -scheme <Name> -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16'
 swiftlint lint               # Lint the codebase
 ```
 

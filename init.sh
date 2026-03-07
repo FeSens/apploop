@@ -33,23 +33,35 @@ echo "Checking Swift..."
 swift --version 2>/dev/null | head -1
 echo "  OK"
 
-# 3. Resolve dependencies (if Package.swift exists)
+# 3. Detect project type and build/test
 if [ -f "Package.swift" ]; then
+    echo "Detected: Swift Package Manager project"
     echo "Resolving Swift packages..."
     swift package resolve
     echo "  OK"
 
-    # 4. Build
     echo "Building project..."
     swift build 2>&1 | tail -5
     echo "  OK"
 
-    # 5. Run tests (baseline check)
     echo "Running tests (baseline check)..."
     swift test 2>&1 | tail -10
     echo "  OK"
+elif XCPROJ=$(ls -d *.xcodeproj 2>/dev/null | head -1); [ -n "$XCPROJ" ]; then
+    SCHEME="${XCPROJ%.xcodeproj}"
+    echo "Detected: Xcode project ($XCPROJ, scheme: $SCHEME)"
+
+    echo "Building project..."
+    xcodebuild build -project "$XCPROJ" -scheme "$SCHEME" -sdk iphonesimulator \
+        -destination 'platform=iOS Simulator,name=iPhone 16' -quiet 2>&1 | tail -5
+    echo "  OK"
+
+    echo "Running tests (baseline check)..."
+    xcodebuild test -project "$XCPROJ" -scheme "$SCHEME" -sdk iphonesimulator \
+        -destination 'platform=iOS Simulator,name=iPhone 16' -quiet 2>&1 | tail -10
+    echo "  OK"
 else
-    echo "No Package.swift found — skipping build/test (create project structure first)"
+    echo "No Package.swift or .xcodeproj found — skipping build/test (create project structure first)"
 fi
 
 # 6. Validate feature dependency graph

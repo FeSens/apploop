@@ -37,8 +37,16 @@ template_sub() {
   echo "$text" | sed "s|{{${key}}}|${val}|g"
 }
 
-# Skip all checks if no Package.swift yet (project not scaffolded)
-if [ ! -f "Package.swift" ]; then
+# Detect project type: SPM (Package.swift) or Xcode project (.xcodeproj/.xcworkspace)
+PROJECT_TYPE=""
+if [ -f "Package.swift" ]; then
+  PROJECT_TYPE="spm"
+elif ls *.xcodeproj 1>/dev/null 2>&1 || ls *.xcworkspace 1>/dev/null 2>&1; then
+  PROJECT_TYPE="xcode"
+fi
+
+# Skip all checks if no project exists yet (not scaffolded)
+if [ -z "$PROJECT_TYPE" ]; then
   exit 0
 fi
 
@@ -46,15 +54,33 @@ ISSUES=""
 ACTIONS=""
 
 # 1. Build check
-if ! swift build >/dev/null 2>&1; then
-  ISSUES="${ISSUES}build_failure "
-  ACTIONS="${ACTIONS}>> IMMEDIATE: Fix the build error. Run 'swift build' to see full errors.\n"
+if [ "$PROJECT_TYPE" = "spm" ]; then
+  if ! swift build >/dev/null 2>&1; then
+    ISSUES="${ISSUES}build_failure "
+    ACTIONS="${ACTIONS}>> IMMEDIATE: Fix the build error. Run 'swift build' to see full errors.\n"
+  fi
+else
+  XCPROJ=$(ls -d *.xcodeproj 2>/dev/null | head -1)
+  SCHEME="${XCPROJ%.xcodeproj}"
+  if [ -n "$XCPROJ" ] && ! xcodebuild build -project "$XCPROJ" -scheme "$SCHEME" -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' -quiet 2>/dev/null; then
+    ISSUES="${ISSUES}build_failure "
+    ACTIONS="${ACTIONS}>> IMMEDIATE: Fix the build error. Run 'xcodebuild build' to see full errors.\n"
+  fi
 fi
 
 # 2. Test check
-if ! swift test >/dev/null 2>&1; then
-  ISSUES="${ISSUES}test_failure "
-  ACTIONS="${ACTIONS}>> IMMEDIATE: Fix failing tests. Run 'swift test' to see which tests fail.\n"
+if [ "$PROJECT_TYPE" = "spm" ]; then
+  if ! swift test >/dev/null 2>&1; then
+    ISSUES="${ISSUES}test_failure "
+    ACTIONS="${ACTIONS}>> IMMEDIATE: Fix failing tests. Run 'swift test' to see which tests fail.\n"
+  fi
+else
+  XCPROJ=$(ls -d *.xcodeproj 2>/dev/null | head -1)
+  SCHEME="${XCPROJ%.xcodeproj}"
+  if [ -n "$XCPROJ" ] && ! xcodebuild test -project "$XCPROJ" -scheme "$SCHEME" -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' -quiet 2>/dev/null; then
+    ISSUES="${ISSUES}test_failure "
+    ACTIONS="${ACTIONS}>> IMMEDIATE: Fix failing tests. Run 'xcodebuild test' to see which tests fail.\n"
+  fi
 fi
 
 # 3. Architecture check
