@@ -1,0 +1,18 @@
+{
+  "project": "{{PROJECT_NAME}}",
+  "description": "{{PROJECT_DESCRIPTION}}",
+  "features": [
+  ],
+  "_schema": {
+    "feature": {
+      "id": "string — unique identifier (e.g., core-001, ui-001)",
+      "description": "string — what this feature does",
+      "phase": "string — mvp, polish, stretch",
+      "category": "string — domain, service, ui, infra",
+      "depends_on": "string[] — feature IDs that must pass before this can start",
+      "passes": "boolean — true when implemented and verified",
+      "test_steps": "string[] — steps to verify the feature works",
+      "files": "string[] — (optional) key files this feature creates/modifies, for conflict detection"
+    }
+  }
+}

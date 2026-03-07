@@ -1,0 +1,17 @@
+# Claude Code worktrees (parallel agent workspaces)
+.claude/worktrees/
+
+# Build artifacts
+.build/
+DerivedData/
+
+# QA screenshots (regenerated each QA pass)
+screenshots/
+
+# macOS
+.DS_Store
+
+# Xcode
+*.xcuserdata
+*.xcworkspace/xcuserdata/
+xcuserdata/
