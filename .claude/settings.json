@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd {{PROJECT_PATH}} && if [ -f Package.swift ]; then BUILD_OUT=$(swift build 2>&1); EXIT=$?; if [ $EXIT -ne 0 ]; then echo 'BUILD FAILED — fix before continuing:'; echo \"$BUILD_OUT\" | grep -E '(error:|warning:)' | head -10; exit 1; else echo 'Build OK'; fi; fi",
+            "command": "if [ -f Package.swift ]; then BUILD_OUT=$(swift build 2>&1); EXIT=$?; if [ $EXIT -ne 0 ]; then echo 'BUILD FAILED — fix before continuing:'; echo \"$BUILD_OUT\" | grep -E '(error:|warning:)' | head -10; exit 1; else echo 'Build OK'; fi; fi",
             "description": "Build after edits — show only errors if build fails"
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd {{PROJECT_PATH}} && bash scripts/stop-gate.sh",
+            "command": "bash scripts/stop-gate.sh",
             "description": "Block stop and re-inject next task until all features pass"
           }
         ]
