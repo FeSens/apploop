@@ -35,11 +35,15 @@ when the agent enters QA mode for the first time. Structure:
       ],
       "checklist": {
         "no_overlapping_elements": true,
+        "bottom_region_clear": false,
+        "no_tab_bar_overlap": false,
+        "no_zorder_conflicts": false,
         "text_not_truncated": true,
         "buttons_fully_visible": true,
         "navigation_title_correct": true,
         "tab_bar_visible": true,
         "spacing_consistent": true,
+        "safe_areas_respected": false,
         "accumulated_state_correct": false,
         "no_stale_data": false,
         "dark_mode_checked": false,
@@ -259,30 +263,69 @@ After all flows are verified:
 
 Apply this checklist to EVERY screenshot. All items must pass.
 
+**CRITICAL: Screenshot analysis must be meticulous.** Do not glance at a screenshot and
+move on. Systematically scan from top to bottom, edge to edge. The most common QA failures
+are subtle overlaps and clipping that pass a casual glance but are obvious to a real user.
+
 ### Layout & Structure
 - [ ] Navigation title visible and not overlapping content
-- [ ] Tab bar fully visible (not hidden behind content)
+- [ ] Tab bar fully visible (not hidden behind content or other UI elements)
 - [ ] No elements overlapping or clipped at screen edges
-- [ ] Safe area respected (content not under notch/dynamic island)
-- [ ] Scroll views have correct content insets
+- [ ] Safe area respected (content not under notch/dynamic island/home indicator)
+- [ ] Scroll views have correct content insets (content not hidden behind fixed bars)
+- [ ] Bottom content not obscured by tab bar, toolbar, or floating buttons
+
+### Overlap & Z-Order Analysis (CRITICAL — most missed category)
+
+**Scan EVERY screenshot specifically for these overlap patterns:**
+
+- [ ] **Tab bar vs content**: Full-width buttons, cards, or lists must NOT extend behind the
+      tab bar. Check the bottom 80-100pt of the screen carefully — is any interactive element
+      partially hidden behind the tab bar?
+- [ ] **Floating buttons vs content**: FABs, "GO" buttons, or bottom-anchored CTAs must have
+      clear separation from tab bars, toolbars, and bottom safe area. They must not overlap
+      with the home indicator region on notched devices.
+- [ ] **Overlapping text/badges**: Labels, badges, or status indicators must not overlap each
+      other. Check areas where multiple indicators cluster (e.g., difficulty badge + score +
+      operation indicator in the same row).
+- [ ] **Stacked controls at screen bottom**: When a screen has BOTH a custom bottom bar/button
+      AND a system tab bar, verify they don't fight for the same space. There must be clear
+      visual separation between them.
+- [ ] **Keyboard overlap**: When a text field or number pad is visible, verify it doesn't
+      obscure the submit button, tab bar, or other interactive elements.
+- [ ] **Scroll content behind fixed headers/footers**: Scroll the content to its extremes —
+      does the first item peek out from under the nav bar? Does the last item sit above the
+      tab bar with proper inset?
+
+**How to catch overlaps:**
+1. Look at every edge where two UI regions meet (nav bar/content, content/tab bar, content/keyboard)
+2. Check if any element crosses a boundary it shouldn't
+3. Pay special attention to the bottom 20% of the screen — this is where most overlaps occur
+4. If a button or card touches or overlaps the tab bar, it is a FAIL even if it's "almost" okay
 
 ### Typography & Readability
-- [ ] Text is not truncated (check long strings)
+- [ ] Text is not truncated (check long strings, especially in narrow containers)
 - [ ] Font sizes are readable (minimum 11pt for body text)
 - [ ] Text contrast meets accessibility standards (4.5:1 ratio)
 - [ ] Labels aligned consistently
+- [ ] Text does not overflow its container or overlap adjacent elements
+- [ ] Dynamic type: text containers expand gracefully (no clipping at larger sizes)
 
 ### Interactive Elements
 - [ ] Buttons are fully visible and have adequate tap targets (44x44pt minimum)
 - [ ] Interactive elements have visual feedback states
 - [ ] Form fields are not hidden behind keyboard
 - [ ] Disabled states are visually distinct
+- [ ] Tappable elements are not partially obscured by other views
+- [ ] No two tappable elements overlap (would cause mis-taps)
 
 ### Spacing & Alignment
-- [ ] Consistent margins and padding
+- [ ] Consistent margins and padding throughout the screen
 - [ ] List items evenly spaced
 - [ ] No unexpected gaps or cramped sections
 - [ ] Content centered where appropriate
+- [ ] Elements at screen edges have proper padding (not touching the edge)
+- [ ] Vertical spacing between sections is consistent and intentional
 
 ### State Verification
 - [ ] Empty states display helpful messages
@@ -295,6 +338,7 @@ Apply this checklist to EVERY screenshot. All items must pass.
 - [ ] No hard-coded colors causing contrast issues
 - [ ] Images and icons adapt to dark mode
 - [ ] Separators and borders visible
+- [ ] Gradient backgrounds don't wash out text in dark mode
 
 ### Accumulated State & Extended Use
 - [ ] Lists display correctly with 10+ items (scrolling, no clipping)
@@ -325,6 +369,11 @@ screenshots/
 |-------|-------------|-----|
 | Nav title overlaps content | Large title mode | `.navigationBarTitleDisplayMode(.inline)` |
 | Button behind tab bar | No bottom padding | Add `.safeAreaInset(edge: .bottom)` or use `VStack` with spacer |
+| Full-width button overlaps tab bar | Ignoring safe area | Use `.padding(.bottom)` or `.safeAreaInset(edge: .bottom)` to push above tab bar |
+| Floating CTA overlaps home indicator | Not respecting bottom safe area | Place button inside safe area or add `safeAreaPadding` |
+| Two bottom bars stacked/overlapping | Custom bar + TabView conflict | Use `.toolbar` or `.safeAreaInset` instead of absolute positioning; let TabView manage its own bar |
+| Badges/labels overlap each other | Fixed layout with dynamic content | Use `HStack` with `.layoutPriority`, or `ViewThatFits`, or reduce content at smaller sizes |
+| Number pad covers submit button | Content doesn't account for input area | Wrap in `ScrollView`, use `.safeAreaInset`, or reposition button above input area |
 | Text truncated | Fixed frame | Use flexible layout, `.lineLimit(nil)` |
 | Keyboard hides input | No scroll adjustment | Wrap in `ScrollView` or use `.scrollDismissesKeyboard()` |
 | Dark mode invisible text | Hard-coded color | Use semantic colors (`Color.primary`, `Color.secondary`) |

@@ -213,11 +213,14 @@ QA mode activates after all features pass. See `docs/qa-strategy.md` for the ful
 
 1. **Generate** `qa-report.json` from `features.json` (group features into user flows)
 2. **For each flow**: build → launch → perform actions → screenshot every step → verify visually
-3. **Visual checklist** (apply to every screenshot):
-   - No overlapping elements, text not truncated
-   - Buttons fully visible with adequate tap targets
-   - Navigation title and tab bar correct
-   - Spacing consistent, safe areas respected
+3. **Visual checklist** (apply to every screenshot — scan top-to-bottom, edge-to-edge):
+   - **Overlap check (CRITICAL)**: Scan the bottom 20% of every screen — buttons, cards, and
+     content must NOT overlap the tab bar, home indicator, or each other. Check every boundary
+     where two UI regions meet. If ANY element crosses into another's space, it is a FAIL.
+   - No text truncated, no labels overflowing containers
+   - Buttons fully visible with adequate tap targets (44x44pt), not obscured by other views
+   - Navigation title and tab bar correct and fully visible
+   - Spacing consistent, safe areas respected on all edges
    - Dark mode pass for all screens
 4. **If issue found**: fix code → rebuild → re-screenshot → re-verify
 5. **Mark flow verified** in `qa-report.json` when all steps + checklist pass
@@ -337,5 +340,9 @@ After implementing a feature, verify with computer use:
 1. Write XCUITest FIRST (red)
 2. Implement the UI (green)
 3. Run XCUITests in simulator — must pass
-4. Capture screenshot evidence, analyze to see if there is any overlapping or things off
+4. Capture screenshot evidence — analyze METICULOUSLY:
+   - Scan top-to-bottom, edge-to-edge for any overlap, clipping, or misalignment
+   - Pay special attention to the bottom 20% (tab bar overlap, home indicator, stacked controls)
+   - Check every boundary where two UI regions meet
+   - If ANY visual issue exists, fix it before proceeding
 5. Only THEN mark as passing in features.json

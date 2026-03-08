@@ -56,10 +56,14 @@ QA PROTOCOL:
 3. For EACH step in the current flow:
    a. Perform the action using computer use
    b. Take a screenshot: xcrun simctl io {{SIMULATOR_UUID}} screenshot screenshots/<name>.png
-   c. Read the screenshot with the Read tool — visually analyze it
-   d. Evaluate against the visual checklist (layout, typography, spacing, buttons, dark mode)
-   e. If issues found: fix the code, rebuild, re-screenshot, re-verify
-   f. Update qa-report.json with screenshot path and verified status
+   c. Read the screenshot with the Read tool — METICULOUSLY analyze it top-to-bottom, edge-to-edge
+   d. OVERLAP CHECK (most missed issue): Scan the bottom 20% of the screen — do ANY elements
+      overlap the tab bar, home indicator, or each other? Check every boundary where two UI
+      regions meet (nav bar/content, content/tab bar, content/keyboard, button/tab bar).
+      If any element crosses into another's region, it is a FAIL. Fix it before moving on.
+   e. Evaluate against the FULL visual checklist (layout, typography, spacing, buttons, dark mode)
+   f. If issues found: fix the code, rebuild, re-screenshot, re-verify
+   g. Update qa-report.json with screenshot path and verified status
 4. After all steps pass, complete the flow checklist and mark flow as verified
 5. Move to the next unverified flow
 6. MANDATORY SOAK TEST: Use the app like a real user — create many items, navigate back and
